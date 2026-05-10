@@ -1,8 +1,8 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
+import { resolve } from "node:path";
 import { env } from "../config/env.js";
 import type { PublicUser, Role, StoredUser } from "../types/auth.js";
+import { readJsonArray, writeJsonArray } from "../utils/jsonFile.js";
 
 type UserCreateInput = {
   email: string;
@@ -136,23 +136,13 @@ export class UserRepository {
   }
 
   private async readUsers(): Promise<StoredUser[]> {
-    try {
-      const raw = await readFile(this.filePath, "utf8");
-      return (JSON.parse(raw) as StoredUser[]).map((user) =>
-        this.normalizeUser(user)
-      );
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return [];
-      }
-
-      throw error;
-    }
+    return (await readJsonArray<StoredUser>(this.filePath)).map((user) =>
+      this.normalizeUser(user)
+    );
   }
 
   private async writeUsers(users: StoredUser[]) {
-    await mkdir(dirname(this.filePath), { recursive: true });
-    await writeFile(this.filePath, `${JSON.stringify(users, null, 2)}\n`);
+    await writeJsonArray(this.filePath, users);
   }
 
   private normalizeUser(user: StoredUser): StoredUser {

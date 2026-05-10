@@ -11,6 +11,7 @@ import {
   resetPasswordSchema
 } from "../schemas/authSchemas.js";
 import { authenticate } from "../middleware/authenticate.js";
+import { authLimiter } from "../middleware/rateLimiters.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { AppError } from "../utils/errors.js";
@@ -45,6 +46,7 @@ const issueTokenPair = async (user: PublicUser) => {
 
 router.post(
   "/register",
+  authLimiter,
   validateRequest(registerSchema),
   asyncHandler(async (req, res) => {
     const existingUser = await users.findByEmail(req.body.email);
@@ -70,6 +72,7 @@ router.post(
 
 router.post(
   "/login",
+  authLimiter,
   validateRequest(loginSchema),
   asyncHandler(async (req, res) => {
     const user = await users.findByEmail(req.body.email);
@@ -95,6 +98,7 @@ router.post(
 
 router.post(
   "/refresh",
+  authLimiter,
   validateRequest(refreshTokenSchema),
   asyncHandler(async (req, res) => {
     const session = await sessions.findActiveByTokenHash(
@@ -150,6 +154,7 @@ router.post(
 
 router.post(
   "/password/forgot",
+  authLimiter,
   validateRequest(forgotPasswordSchema),
   asyncHandler(async (req, res) => {
     const user = await users.findByEmail(req.body.email);
@@ -175,8 +180,10 @@ router.post(
         expiresAt
       });
 
-      response.resetToken = resetToken;
-      response.resetTokenExpiresAt = expiresAt;
+      if (env.NODE_ENV !== "production") {
+        response.resetToken = resetToken;
+        response.resetTokenExpiresAt = expiresAt;
+      }
     }
 
     res.json(response);
@@ -185,6 +192,7 @@ router.post(
 
 router.post(
   "/password/reset",
+  authLimiter,
   validateRequest(resetPasswordSchema),
   asyncHandler(async (req, res) => {
     const reset = await passwordResets.findActiveByTokenHash(

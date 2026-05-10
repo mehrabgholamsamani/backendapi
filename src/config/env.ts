@@ -3,6 +3,8 @@ import { z } from "zod";
 
 dotenv.config();
 
+const defaultDevelopmentSecret = "development-secret-change-me-32chars";
+
 const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
@@ -12,7 +14,7 @@ const envSchema = z.object({
   JWT_SECRET: z
     .string()
     .min(32, "JWT_SECRET must be at least 32 characters long")
-    .default("development-secret-change-me-32chars"),
+    .default(defaultDevelopmentSecret),
   JWT_EXPIRES_IN: z.string().default("15m"),
   DATA_FILE: z.string().default("./data/users.json"),
   SESSION_FILE: z.string().default("./data/sessions.json"),
@@ -22,3 +24,13 @@ const envSchema = z.object({
 });
 
 export const env = envSchema.parse(process.env);
+
+if (env.NODE_ENV === "production") {
+  if (env.JWT_SECRET === defaultDevelopmentSecret) {
+    throw new Error("JWT_SECRET must be set in production");
+  }
+
+  if (env.CORS_ORIGIN === "*") {
+    throw new Error("CORS_ORIGIN must be explicit in production");
+  }
+}

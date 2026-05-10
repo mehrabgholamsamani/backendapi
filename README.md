@@ -29,11 +29,11 @@ Set a strong `JWT_SECRET` in `.env` before using this outside local development.
 ## Scripts
 
 ```bash
-npm run dev        # start with tsx watch
-npm run build      # compile TypeScript to dist
-npm start          # run compiled server
-npm test           # run API tests
-npm run typecheck  # type-check without emitting
+npm run dev
+npm run build
+npm start
+npm test
+npm run typecheck
 ```
 
 ## Routes
@@ -84,7 +84,7 @@ Revokes the supplied refresh token.
 ### `POST /auth/password/forgot`
 
 Creates a one-time password reset token. In this local API starter, the token is
-returned in the response so it can be tested without an email provider.
+returned outside production so it can be tested without an email provider.
 
 ```json
 {

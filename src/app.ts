@@ -1,16 +1,19 @@
 import cors from "cors";
 import express from "express";
-import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import morgan from "morgan";
 import { env } from "./config/env.js";
 import { adminRouter } from "./routes/adminRoutes.js";
 import { authRouter } from "./routes/authRoutes.js";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
+import { globalLimiter } from "./middleware/rateLimiters.js";
+import { requestContext } from "./middleware/requestContext.js";
 
 export const createApp = () => {
   const app = express();
 
+  app.disable("x-powered-by");
+  app.use(requestContext);
   app.use(helmet());
   app.use(
     cors({
@@ -19,14 +22,7 @@ export const createApp = () => {
     })
   );
   app.use(express.json({ limit: "100kb" }));
-  app.use(
-    rateLimit({
-      windowMs: 15 * 60 * 1000,
-      limit: 100,
-      standardHeaders: "draft-8",
-      legacyHeaders: false
-    })
-  );
+  app.use(globalLimiter);
 
   if (env.NODE_ENV !== "test") {
     app.use(morgan("dev"));
@@ -34,6 +30,13 @@ export const createApp = () => {
 
   app.get("/health", (_req, res) => {
     res.json({ status: "ok" });
+  });
+  app.get("/ready", (_req, res) => {
+    res.json({
+      status: "ready",
+      uptime: process.uptime(),
+      environment: env.NODE_ENV
+    });
   });
   app.use("/auth", authRouter);
   app.use("/admin", adminRouter);

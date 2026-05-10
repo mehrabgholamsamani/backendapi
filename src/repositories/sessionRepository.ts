@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { env } from "../config/env.js";
 import type { StoredRefreshSession } from "../types/auth.js";
+import { readJsonArray, writeJsonArray } from "../utils/jsonFile.js";
 
 type SessionCreateInput = {
   userId: string;
@@ -74,20 +74,10 @@ export class SessionRepository {
   }
 
   private async readSessions(): Promise<StoredRefreshSession[]> {
-    try {
-      const raw = await readFile(this.filePath, "utf8");
-      return JSON.parse(raw) as StoredRefreshSession[];
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return [];
-      }
-
-      throw error;
-    }
+    return readJsonArray<StoredRefreshSession>(this.filePath);
   }
 
   private async writeSessions(sessions: StoredRefreshSession[]) {
-    await mkdir(dirname(this.filePath), { recursive: true });
-    await writeFile(this.filePath, `${JSON.stringify(sessions, null, 2)}\n`);
+    await writeJsonArray(this.filePath, sessions);
   }
 }

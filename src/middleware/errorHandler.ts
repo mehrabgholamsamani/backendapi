@@ -6,17 +6,19 @@ export const notFoundHandler: RequestHandler = (req, res) => {
   res.status(404).json({
     error: {
       code: "NOT_FOUND",
-      message: `Route ${req.method} ${req.path} not found`
+      message: `Route ${req.method} ${req.path} not found`,
+      requestId: req.requestId
     }
   });
 };
 
-export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
+export const errorHandler: ErrorRequestHandler = (error, req, res, _next) => {
   if (error instanceof AppError) {
     return res.status(error.statusCode).json({
       error: {
         code: error.code,
-        message: error.message
+        message: error.message,
+        requestId: req.requestId
       }
     });
   }
@@ -27,7 +29,8 @@ export const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
       message:
         env.NODE_ENV === "production"
           ? "An unexpected error occurred"
-          : error.message
+          : error.message,
+      requestId: req.requestId
     }
   });
 };

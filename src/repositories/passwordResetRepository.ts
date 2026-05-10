@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { env } from "../config/env.js";
 import type { StoredPasswordReset } from "../types/auth.js";
+import { readJsonArray, writeJsonArray } from "../utils/jsonFile.js";
 
 type PasswordResetCreateInput = {
   userId: string;
@@ -73,20 +73,10 @@ export class PasswordResetRepository {
   }
 
   private async readResets(): Promise<StoredPasswordReset[]> {
-    try {
-      const raw = await readFile(this.filePath, "utf8");
-      return JSON.parse(raw) as StoredPasswordReset[];
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return [];
-      }
-
-      throw error;
-    }
+    return readJsonArray<StoredPasswordReset>(this.filePath);
   }
 
   private async writeResets(resets: StoredPasswordReset[]) {
-    await mkdir(dirname(this.filePath), { recursive: true });
-    await writeFile(this.filePath, `${JSON.stringify(resets, null, 2)}\n`);
+    await writeJsonArray(this.filePath, resets);
   }
 }

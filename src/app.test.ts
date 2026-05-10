@@ -41,6 +41,20 @@ const createAdminAccessToken = async () => {
 };
 
 describe("auth API", () => {
+  it("returns request ids and readiness status", async () => {
+    const app = await loadApp();
+
+    const health = await request(app)
+      .get("/health")
+      .set("x-request-id", "test-request-id");
+    const ready = await request(app).get("/ready");
+
+    expect(health.status).toBe(200);
+    expect(health.header["x-request-id"]).toBe("test-request-id");
+    expect(ready.status).toBe(200);
+    expect(ready.body.status).toBe("ready");
+  });
+
   it("registers, logs in, and returns the current user", async () => {
     const app = await loadApp();
 
@@ -181,6 +195,21 @@ describe("auth API", () => {
     expect(forgot.status).toBe(200);
     expect(forgot.body.message).toEqual(expect.any(String));
     expect(forgot.body.resetToken).toBeUndefined();
+  });
+
+  it("rate limits repeated authentication attempts", async () => {
+    const app = await loadApp();
+
+    const attempts = await Promise.all(
+      Array.from({ length: 11 }, () =>
+        request(app).post("/auth/login").send({
+          email: "missing@example.com",
+          password: "password123"
+        })
+      )
+    );
+
+    expect(attempts.at(-1)?.status).toBe(429);
   });
 
   it("rejects admin routes for regular users", async () => {
