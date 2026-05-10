@@ -9,6 +9,7 @@ TypeScript Express API with authentication and role/permission authorization.
 - Refresh-token sessions with rotation and logout
 - Bcrypt password hashing
 - Role and permission authorization middleware
+- Admin user management for roles, account status, and deletion
 - Helmet, CORS, JSON body limits, request logging, and rate limiting
 - Zod request validation
 - Local JSON user store for easy development
@@ -87,6 +88,30 @@ Requires `Authorization: Bearer <accessToken>`.
 
 Requires `Authorization: Bearer <accessToken>` for a user with the `admin:read`
 permission.
+
+### `PATCH /admin/users/:id/roles`
+
+Requires `users:write`.
+
+```json
+{
+  "roles": ["user", "admin"]
+}
+```
+
+### `PATCH /admin/users/:id/status`
+
+Requires `users:write`. Disabled users cannot authenticate or refresh tokens.
+
+```json
+{
+  "isDisabled": true
+}
+```
+
+### `DELETE /admin/users/:id`
+
+Requires `users:write`. Deleting a user revokes their refresh sessions.
 
 ## Authorization Model
 

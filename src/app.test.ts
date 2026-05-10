@@ -24,6 +24,21 @@ const loadApp = async () => {
   return createApp();
 };
 
+const createAdminAccessToken = async () => {
+  const { UserRepository } = await import("./repositories/userRepository.js");
+  const { hashPassword } = await import("./utils/password.js");
+  const { signAccessToken } = await import("./utils/token.js");
+  const users = new UserRepository();
+  const admin = await users.create({
+    email: "admin@example.com",
+    name: "Admin",
+    passwordHash: await hashPassword("password123"),
+    roles: ["admin"]
+  });
+
+  return signAccessToken(users.toPublicUser(admin));
+};
+
 describe("auth API", () => {
   it("registers, logs in, and returns the current user", async () => {
     const app = await loadApp();
@@ -118,5 +133,89 @@ describe("auth API", () => {
       .set("Authorization", `Bearer ${registration.body.accessToken}`);
 
     expect(response.status).toBe(403);
+  });
+
+  it("lets admins update roles and list users", async () => {
+    const app = await loadApp();
+    const adminToken = await createAdminAccessToken();
+    const registration = await request(app).post("/auth/register").send({
+      email: "person@example.com",
+      name: "Person",
+      password: "password123"
+    });
+
+    const update = await request(app)
+      .patch(`/admin/users/${registration.body.user.id}/roles`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ roles: ["user", "admin"] });
+
+    expect(update.status).toBe(200);
+    expect(update.body.user.roles).toEqual(["user", "admin"]);
+
+    const list = await request(app)
+      .get("/admin/users")
+      .set("Authorization", `Bearer ${adminToken}`);
+
+    expect(list.status).toBe(200);
+    expect(list.body.users).toHaveLength(2);
+    expect(list.body.users[1].passwordHash).toBeUndefined();
+  });
+
+  it("blocks disabled accounts and revokes their refresh sessions", async () => {
+    const app = await loadApp();
+    const adminToken = await createAdminAccessToken();
+    const registration = await request(app).post("/auth/register").send({
+      email: "person@example.com",
+      name: "Person",
+      password: "password123"
+    });
+
+    const disable = await request(app)
+      .patch(`/admin/users/${registration.body.user.id}/status`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ isDisabled: true });
+
+    expect(disable.status).toBe(200);
+    expect(disable.body.user.isDisabled).toBe(true);
+
+    const me = await request(app)
+      .get("/auth/me")
+      .set("Authorization", `Bearer ${registration.body.accessToken}`);
+
+    expect(me.status).toBe(401);
+
+    const refresh = await request(app).post("/auth/refresh").send({
+      refreshToken: registration.body.refreshToken
+    });
+
+    expect(refresh.status).toBe(401);
+  });
+
+  it("lets admins delete users and blocks self-delete", async () => {
+    const app = await loadApp();
+    const adminToken = await createAdminAccessToken();
+    const registration = await request(app).post("/auth/register").send({
+      email: "person@example.com",
+      name: "Person",
+      password: "password123"
+    });
+
+    const selfDelete = await request(app)
+      .delete(`/admin/users/${registration.body.user.id}`)
+      .set("Authorization", `Bearer ${registration.body.accessToken}`);
+
+    expect(selfDelete.status).toBe(403);
+
+    const deleted = await request(app)
+      .delete(`/admin/users/${registration.body.user.id}`)
+      .set("Authorization", `Bearer ${adminToken}`);
+
+    expect(deleted.status).toBe(204);
+
+    const me = await request(app)
+      .get("/auth/me")
+      .set("Authorization", `Bearer ${registration.body.accessToken}`);
+
+    expect(me.status).toBe(401);
   });
 });

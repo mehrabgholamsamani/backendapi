@@ -39,13 +39,70 @@ export class UserRepository {
       email: input.email.toLowerCase(),
       name: input.name,
       roles: input.roles ?? ["user"],
+      isEmailVerified: false,
+      isDisabled: false,
       passwordHash: input.passwordHash,
-      createdAt: now
+      createdAt: now,
+      updatedAt: now
     };
 
     users.push(user);
     await this.writeUsers(users);
     return user;
+  }
+
+  async updateRoles(id: string, roles: Role[]): Promise<StoredUser | undefined> {
+    const users = await this.readUsers();
+    const user = users.find((item) => item.id === id);
+    if (!user) {
+      return undefined;
+    }
+
+    user.roles = roles;
+    user.updatedAt = new Date().toISOString();
+    await this.writeUsers(users);
+    return user;
+  }
+
+  async setDisabled(
+    id: string,
+    isDisabled: boolean
+  ): Promise<StoredUser | undefined> {
+    const users = await this.readUsers();
+    const user = users.find((item) => item.id === id);
+    if (!user) {
+      return undefined;
+    }
+
+    user.isDisabled = isDisabled;
+    user.updatedAt = new Date().toISOString();
+    await this.writeUsers(users);
+    return user;
+  }
+
+  async markLogin(id: string): Promise<StoredUser | undefined> {
+    const users = await this.readUsers();
+    const user = users.find((item) => item.id === id);
+    if (!user) {
+      return undefined;
+    }
+
+    const now = new Date().toISOString();
+    user.lastLoginAt = now;
+    user.updatedAt = now;
+    await this.writeUsers(users);
+    return user;
+  }
+
+  async delete(id: string): Promise<boolean> {
+    const users = await this.readUsers();
+    const nextUsers = users.filter((user) => user.id !== id);
+    if (nextUsers.length === users.length) {
+      return false;
+    }
+
+    await this.writeUsers(nextUsers);
+    return true;
   }
 
   toPublicUser(user: StoredUser): PublicUser {
@@ -54,14 +111,20 @@ export class UserRepository {
       email: user.email,
       name: user.name,
       roles: user.roles,
-      createdAt: user.createdAt
+      isEmailVerified: user.isEmailVerified,
+      isDisabled: user.isDisabled,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      lastLoginAt: user.lastLoginAt
     };
   }
 
   private async readUsers(): Promise<StoredUser[]> {
     try {
       const raw = await readFile(this.filePath, "utf8");
-      return JSON.parse(raw) as StoredUser[];
+      return (JSON.parse(raw) as StoredUser[]).map((user) =>
+        this.normalizeUser(user)
+      );
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") {
         return [];
@@ -74,5 +137,14 @@ export class UserRepository {
   private async writeUsers(users: StoredUser[]) {
     await mkdir(dirname(this.filePath), { recursive: true });
     await writeFile(this.filePath, `${JSON.stringify(users, null, 2)}\n`);
+  }
+
+  private normalizeUser(user: StoredUser): StoredUser {
+    return {
+      ...user,
+      isEmailVerified: user.isEmailVerified ?? false,
+      isDisabled: user.isDisabled ?? false,
+      updatedAt: user.updatedAt ?? user.createdAt
+    };
   }
 }

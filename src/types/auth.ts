@@ -12,7 +12,11 @@ export type PublicUser = {
   email: string;
   name: string;
   roles: Role[];
+  isEmailVerified: boolean;
+  isDisabled: boolean;
   createdAt: string;
+  updatedAt: string;
+  lastLoginAt?: string;
 };
 
 export type StoredUser = PublicUser & {

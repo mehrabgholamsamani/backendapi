@@ -75,8 +75,12 @@ router.post(
     if (!user || !validPassword) {
       throw new AppError(401, "Invalid email or password", "INVALID_LOGIN");
     }
+    if (user.isDisabled) {
+      throw new AppError(403, "Account is disabled", "ACCOUNT_DISABLED");
+    }
 
-    const publicUser = users.toPublicUser(user);
+    const loggedInUser = await users.markLogin(user.id);
+    const publicUser = users.toPublicUser(loggedInUser ?? user);
     const tokens = await issueTokenPair(publicUser);
     res.json({
       user: publicUser,
@@ -104,6 +108,10 @@ router.post(
     if (!user) {
       await sessions.revoke(session.id);
       throw new AppError(401, "User no longer exists", "USER_NOT_FOUND");
+    }
+    if (user.isDisabled) {
+      await sessions.revoke(session.id);
+      throw new AppError(403, "Account is disabled", "ACCOUNT_DISABLED");
     }
 
     const publicUser = users.toPublicUser(user);

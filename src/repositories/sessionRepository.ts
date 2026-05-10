@@ -56,6 +56,23 @@ export class SessionRepository {
     await this.writeSessions(sessions);
   }
 
+  async revokeAllForUser(userId: string) {
+    const sessions = await this.readSessions();
+    const now = new Date().toISOString();
+    let changed = false;
+
+    for (const session of sessions) {
+      if (session.userId === userId && !session.revokedAt) {
+        session.revokedAt = now;
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      await this.writeSessions(sessions);
+    }
+  }
+
   private async readSessions(): Promise<StoredRefreshSession[]> {
     try {
       const raw = await readFile(this.filePath, "utf8");
