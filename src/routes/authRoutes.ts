@@ -1,11 +1,14 @@
 import { Router } from "express";
 import { env } from "../config/env.js";
+import { PasswordResetRepository } from "../repositories/passwordResetRepository.js";
 import { SessionRepository } from "../repositories/sessionRepository.js";
 import { UserRepository } from "../repositories/userRepository.js";
 import {
+  forgotPasswordSchema,
   loginSchema,
   refreshTokenSchema,
-  registerSchema
+  registerSchema,
+  resetPasswordSchema
 } from "../schemas/authSchemas.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { validateRequest } from "../middleware/validateRequest.js";
@@ -19,6 +22,7 @@ import type { PublicUser } from "../types/auth.js";
 const router = Router();
 const users = new UserRepository();
 const sessions = new SessionRepository();
+const passwordResets = new PasswordResetRepository();
 
 const issueTokenPair = async (user: PublicUser) => {
   const refreshToken = generateRefreshToken();
@@ -139,6 +143,70 @@ router.post(
     if (session) {
       await sessions.revoke(session.id);
     }
+
+    res.status(204).send();
+  })
+);
+
+router.post(
+  "/password/forgot",
+  validateRequest(forgotPasswordSchema),
+  asyncHandler(async (req, res) => {
+    const user = await users.findByEmail(req.body.email);
+    const response: {
+      message: string;
+      resetToken?: string;
+      resetTokenExpiresAt?: string;
+    } = {
+      message: "If the account exists, a password reset token was created"
+    };
+
+    if (user && !user.isDisabled) {
+      await passwordResets.revokeActiveForUser(user.id);
+
+      const resetToken = generateRefreshToken();
+      const expiresAt = new Date(
+        Date.now() + env.PASSWORD_RESET_TTL_MINUTES * 60 * 1000
+      ).toISOString();
+
+      await passwordResets.create({
+        userId: user.id,
+        tokenHash: hashRefreshToken(resetToken),
+        expiresAt
+      });
+
+      response.resetToken = resetToken;
+      response.resetTokenExpiresAt = expiresAt;
+    }
+
+    res.json(response);
+  })
+);
+
+router.post(
+  "/password/reset",
+  validateRequest(resetPasswordSchema),
+  asyncHandler(async (req, res) => {
+    const reset = await passwordResets.findActiveByTokenHash(
+      hashRefreshToken(req.body.resetToken)
+    );
+    if (!reset) {
+      throw new AppError(
+        401,
+        "Password reset token is invalid or expired",
+        "INVALID_PASSWORD_RESET_TOKEN"
+      );
+    }
+
+    const user = await users.findById(reset.userId);
+    if (!user || user.isDisabled) {
+      await passwordResets.markUsed(reset.id);
+      throw new AppError(401, "Account is unavailable", "ACCOUNT_UNAVAILABLE");
+    }
+
+    await users.updatePassword(user.id, await hashPassword(req.body.password));
+    await passwordResets.markUsed(reset.id);
+    await sessions.revokeAllForUser(user.id);
 
     res.status(204).send();
   })

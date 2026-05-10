@@ -33,6 +33,15 @@ export type StoredRefreshSession = {
   replacedBySessionId?: string;
 };
 
+export type StoredPasswordReset = {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  createdAt: string;
+  usedAt?: string;
+};
+
 export type AuthTokenPayload = {
   sub: string;
   email: string;

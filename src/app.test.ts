@@ -13,6 +13,7 @@ beforeEach(async () => {
   process.env.JWT_SECRET = "test-secret-with-at-least-32-characters";
   process.env.DATA_FILE = join(dataDir, "users.json");
   process.env.SESSION_FILE = join(dataDir, "sessions.json");
+  process.env.PASSWORD_RESET_FILE = join(dataDir, "password-resets.json");
 });
 
 afterEach(async () => {
@@ -117,6 +118,69 @@ describe("auth API", () => {
     });
 
     expect(refresh.status).toBe(401);
+  });
+
+  it("resets passwords with one-time tokens and revokes refresh sessions", async () => {
+    const app = await loadApp();
+
+    const registration = await request(app).post("/auth/register").send({
+      email: "person@example.com",
+      name: "Person",
+      password: "password123"
+    });
+
+    const forgot = await request(app).post("/auth/password/forgot").send({
+      email: "person@example.com"
+    });
+
+    expect(forgot.status).toBe(200);
+    expect(forgot.body.resetToken).toEqual(expect.any(String));
+
+    const reset = await request(app).post("/auth/password/reset").send({
+      resetToken: forgot.body.resetToken,
+      password: "new-password123"
+    });
+
+    expect(reset.status).toBe(204);
+
+    const oldLogin = await request(app).post("/auth/login").send({
+      email: "person@example.com",
+      password: "password123"
+    });
+
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await request(app).post("/auth/login").send({
+      email: "person@example.com",
+      password: "new-password123"
+    });
+
+    expect(newLogin.status).toBe(200);
+
+    const refresh = await request(app).post("/auth/refresh").send({
+      refreshToken: registration.body.refreshToken
+    });
+
+    expect(refresh.status).toBe(401);
+
+    const replay = await request(app).post("/auth/password/reset").send({
+      resetToken: forgot.body.resetToken,
+      password: "another-password123"
+    });
+
+    expect(replay.status).toBe(401);
+  });
+
+  it("does not create reset tokens for unknown accounts", async () => {
+    const app = await loadApp();
+
+    const forgot = await request(app).post("/auth/password/forgot").send({
+      email: "missing@example.com"
+    });
+
+    expect(forgot.status).toBe(200);
+    expect(forgot.body.message).toEqual(expect.any(String));
+    expect(forgot.body.resetToken).toBeUndefined();
   });
 
   it("rejects admin routes for regular users", async () => {

@@ -10,6 +10,7 @@ TypeScript Express API with authentication and role/permission authorization.
 - Bcrypt password hashing
 - Role and permission authorization middleware
 - Admin user management for roles, account status, and deletion
+- Password reset tokens with one-time use and session revocation
 - Helmet, CORS, JSON body limits, request logging, and rate limiting
 - Zod request validation
 - Local JSON user store for easy development
@@ -77,6 +78,28 @@ Revokes the supplied refresh token.
 ```json
 {
   "refreshToken": "refresh-token-from-register-or-login"
+}
+```
+
+### `POST /auth/password/forgot`
+
+Creates a one-time password reset token. In this local API starter, the token is
+returned in the response so it can be tested without an email provider.
+
+```json
+{
+  "email": "person@example.com"
+}
+```
+
+### `POST /auth/password/reset`
+
+Updates the password, consumes the reset token, and revokes refresh sessions.
+
+```json
+{
+  "resetToken": "reset-token-from-forgot-password",
+  "password": "new-password123"
 }
 ```
 

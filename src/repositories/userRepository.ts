@@ -94,6 +94,22 @@ export class UserRepository {
     return user;
   }
 
+  async updatePassword(
+    id: string,
+    passwordHash: string
+  ): Promise<StoredUser | undefined> {
+    const users = await this.readUsers();
+    const user = users.find((item) => item.id === id);
+    if (!user) {
+      return undefined;
+    }
+
+    user.passwordHash = passwordHash;
+    user.updatedAt = new Date().toISOString();
+    await this.writeUsers(users);
+    return user;
+  }
+
   async delete(id: string): Promise<boolean> {
     const users = await this.readUsers();
     const nextUsers = users.filter((user) => user.id !== id);

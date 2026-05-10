@@ -16,7 +16,9 @@ const envSchema = z.object({
   JWT_EXPIRES_IN: z.string().default("15m"),
   DATA_FILE: z.string().default("./data/users.json"),
   SESSION_FILE: z.string().default("./data/sessions.json"),
-  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30)
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
+  PASSWORD_RESET_FILE: z.string().default("./data/password-resets.json"),
+  PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(30)
 });
 
 export const env = envSchema.parse(process.env);
