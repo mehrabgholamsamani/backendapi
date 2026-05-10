@@ -19,6 +19,16 @@ export type StoredUser = PublicUser & {
   passwordHash: string;
 };
 
+export type StoredRefreshSession = {
+  id: string;
+  userId: string;
+  tokenHash: string;
+  expiresAt: string;
+  createdAt: string;
+  revokedAt?: string;
+  replacedBySessionId?: string;
+};
+
 export type AuthTokenPayload = {
   sub: string;
   email: string;

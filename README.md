@@ -6,6 +6,7 @@ TypeScript Express API with authentication and role/permission authorization.
 
 - Register, login, and current-user endpoints
 - JWT access tokens
+- Refresh-token sessions with rotation and logout
 - Bcrypt password hashing
 - Role and permission authorization middleware
 - Helmet, CORS, JSON body limits, request logging, and rate limiting
@@ -55,6 +56,26 @@ Returns API health.
 {
   "email": "person@example.com",
   "password": "password123"
+}
+```
+
+### `POST /auth/refresh`
+
+Rotates a refresh token and returns a new access token plus a new refresh token.
+
+```json
+{
+  "refreshToken": "refresh-token-from-register-or-login"
+}
+```
+
+### `POST /auth/logout`
+
+Revokes the supplied refresh token.
+
+```json
+{
+  "refreshToken": "refresh-token-from-register-or-login"
 }
 ```
 

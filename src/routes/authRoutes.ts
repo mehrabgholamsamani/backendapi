@@ -1,15 +1,43 @@
 import { Router } from "express";
+import { env } from "../config/env.js";
+import { SessionRepository } from "../repositories/sessionRepository.js";
 import { UserRepository } from "../repositories/userRepository.js";
-import { loginSchema, registerSchema } from "../schemas/authSchemas.js";
+import {
+  loginSchema,
+  refreshTokenSchema,
+  registerSchema
+} from "../schemas/authSchemas.js";
 import { authenticate } from "../middleware/authenticate.js";
 import { validateRequest } from "../middleware/validateRequest.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { AppError } from "../utils/errors.js";
 import { hashPassword, verifyPassword } from "../utils/password.js";
+import { generateRefreshToken, hashRefreshToken } from "../utils/refreshToken.js";
 import { signAccessToken } from "../utils/token.js";
+import type { PublicUser } from "../types/auth.js";
 
 const router = Router();
 const users = new UserRepository();
+const sessions = new SessionRepository();
+
+const issueTokenPair = async (user: PublicUser) => {
+  const refreshToken = generateRefreshToken();
+  const expiresAt = new Date(
+    Date.now() + env.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  await sessions.create({
+    userId: user.id,
+    tokenHash: hashRefreshToken(refreshToken),
+    expiresAt
+  });
+
+  return {
+    accessToken: signAccessToken(user),
+    refreshToken,
+    refreshTokenExpiresAt: expiresAt
+  };
+};
 
 router.post(
   "/register",
@@ -27,10 +55,11 @@ router.post(
       passwordHash
     });
     const publicUser = users.toPublicUser(user);
+    const tokens = await issueTokenPair(publicUser);
 
     res.status(201).json({
       user: publicUser,
-      accessToken: signAccessToken(publicUser)
+      ...tokens
     });
   })
 );
@@ -48,10 +77,62 @@ router.post(
     }
 
     const publicUser = users.toPublicUser(user);
+    const tokens = await issueTokenPair(publicUser);
     res.json({
       user: publicUser,
-      accessToken: signAccessToken(publicUser)
+      ...tokens
     });
+  })
+);
+
+router.post(
+  "/refresh",
+  validateRequest(refreshTokenSchema),
+  asyncHandler(async (req, res) => {
+    const session = await sessions.findActiveByTokenHash(
+      hashRefreshToken(req.body.refreshToken)
+    );
+    if (!session) {
+      throw new AppError(
+        401,
+        "Refresh token is invalid or expired",
+        "INVALID_REFRESH_TOKEN"
+      );
+    }
+
+    const user = await users.findById(session.userId);
+    if (!user) {
+      await sessions.revoke(session.id);
+      throw new AppError(401, "User no longer exists", "USER_NOT_FOUND");
+    }
+
+    const publicUser = users.toPublicUser(user);
+    const tokens = await issueTokenPair(publicUser);
+    const replacement = await sessions.findActiveByTokenHash(
+      hashRefreshToken(tokens.refreshToken)
+    );
+
+    await sessions.revoke(session.id, replacement?.id);
+
+    res.json({
+      user: publicUser,
+      ...tokens
+    });
+  })
+);
+
+router.post(
+  "/logout",
+  validateRequest(refreshTokenSchema),
+  asyncHandler(async (req, res) => {
+    const session = await sessions.findActiveByTokenHash(
+      hashRefreshToken(req.body.refreshToken)
+    );
+    if (session) {
+      await sessions.revoke(session.id);
+    }
+
+    res.status(204).send();
   })
 );
 
