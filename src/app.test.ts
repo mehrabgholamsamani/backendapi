@@ -238,6 +238,13 @@ describe("auth API", () => {
       password: "password123"
     });
 
+    const duplicateRoles = await request(app)
+      .patch(`/admin/users/${registration.body.user.id}/roles`)
+      .set("Authorization", `Bearer ${adminToken}`)
+      .send({ roles: ["admin", "admin"] });
+
+    expect(duplicateRoles.status).toBe(400);
+
     const update = await request(app)
       .patch(`/admin/users/${registration.body.user.id}/roles`)
       .set("Authorization", `Bearer ${adminToken}`)
