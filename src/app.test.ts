@@ -60,7 +60,7 @@ describe("auth API", () => {
 
     const registration = await request(app).post("/auth/register").send({
       email: "person@example.com",
-      name: "Person",
+      name: "  Person  ",
       password: "password123"
     });
 
@@ -68,6 +68,7 @@ describe("auth API", () => {
     expect(registration.body.accessToken).toEqual(expect.any(String));
     expect(registration.body.refreshToken).toEqual(expect.any(String));
     expect(registration.body.user.email).toBe("person@example.com");
+    expect(registration.body.user.name).toBe("Person");
     expect(registration.body.user.passwordHash).toBeUndefined();
 
     const login = await request(app).post("/auth/login").send({
